@@ -1,81 +1,28 @@
-import {inquirer} from "inquirer";
-import { Command } from "commander";
-import fs from 'fs/promises'; // Use fs/promises for async file operations
+const express = require("express");
+require('dotenv').config()
+const httpStatusText = require('./utils/http.Status.Text')
+const cors = require('cors');
+const app = new express();
+const path = require('node:path')
+const mongoose = require("mongoose");
+mongoose.connect(process.env.MONGO_URL).then(()=>{
+    console.log("mongo server started");
+    
+})
 
-const program = new Command();
+const CourseRoutes = require("./routes/Courses.Route");
+const usersRoute = require('./routes/Users.Route')
+app.use(express.json())
+app.use('/uploads',express.static(path.join(__dirname,'uploads')))
+app.use('/api/courses',cors(),CourseRoutes)
+app.use('/api/users',usersRoute)
 
-program
-  .command('list')
-  .alias('l')
-  .description('List a course')
-  .argument('<title>', 'Course title to view or add')
-  .action(async (title) => { // Make action async to use await
-    try {
-      const filePath = './users.json';
-      let courses = [];
-
-      // Read file asynchronously
-      let data;
-      try {
-        data = await fs.readFile(filePath, 'utf-8');
-      } catch (err) {
-        console.error('Error reading file:', err.message);
-        return;
-      }
-
-      if (data) {
-        courses = JSON.parse(data);
-      }
-
-      // Check if the course is already present
-      const course = courses.find(item => item.title === title);
-
-      if (course) {
-        console.log("Course found");
-        console.table(JSON.parse(data));
-        console.table(course);
-      } else {
-        console.log("Course not found");
-
-        // Prompt user to add a new course
-        const { add } = await inquirer.prompt([
-          {
-            type: "list",
-            name: "add",
-            message: "Add this course?",
-            choices: ['yes', 'no']
-          }
-        ]);
-
-        if (add === 'yes') {
-          const { price } = await inquirer.prompt([{
-            type: "input",
-            name: 'price',
-            message: "What is the price of the new course?"
-          }]);
-
-          const newCourse = {
-            title: title,
-            price: price
-          };
-
-          // Add new course to the array
-          courses.push(newCourse);
-
-          // Write updated array back to file
-          try {
-            await fs.writeFile(filePath, JSON.stringify(courses, null, 2), 'utf8');
-            console.log(`Successfully added ${title} course`);
-          } catch (err) {
-            console.error("Error writing file:", err.message);
-          }
-        } else {
-          console.log("Course not added");
-        }
-      }
-    } catch (err) {
-      console.error('Unexpected error:', err.message);
-    }
-  });
-
-program.parse(process.argv);
+app.all("*",(req,res,next)=>{
+    res.status(404).json({status:httpStatusText.ERROR,message :"this resource is not avialable"})
+})
+app.use((err,req,res,next)=>{
+    res.status(err.statusCode || 500).json({status: err.statusMessage || httpStatusText.ERROR , code : err.statusCode || 404 ,data:null,mesage:err.message})
+})
+app.listen(process.env.PORT || 2001,()=>{
+    console.log("server start of port 2000")
+})
